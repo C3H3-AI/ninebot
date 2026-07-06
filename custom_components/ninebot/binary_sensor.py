@@ -13,13 +13,13 @@ from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant, callback
 from homeassistant.helpers.entity_platform import AddConfigEntryEntitiesCallback
 
-from . import NinebotConfigEntry
 from .entity import NinebotEntity
 
 
 @dataclass(frozen=True, kw_only=True)
 class NinebotBinarySensorEntityDescription(BinarySensorEntityDescription):
     value_fn: Callable
+    attrs_fn: Callable | None = None
 
 
 BINARY_SENSOR_DESCRIPTIONS: tuple[NinebotBinarySensorEntityDescription, ...] = (
@@ -27,6 +27,11 @@ BINARY_SENSOR_DESCRIPTIONS: tuple[NinebotBinarySensorEntityDescription, ...] = (
         key="charging",
         device_class=BinarySensorDeviceClass.BATTERY_CHARGING,
         value_fn=lambda entity: _coerce_bool(entity.device_state.get("charging"), on_value=1),
+        attrs_fn=lambda entity: (
+            {"charging_power": entity.device_state["charging_power"]}
+            if "charging_power" in entity.device_state
+            else {}
+        ),
     ),
     NinebotBinarySensorEntityDescription(
         key="power",
@@ -34,7 +39,7 @@ BINARY_SENSOR_DESCRIPTIONS: tuple[NinebotBinarySensorEntityDescription, ...] = (
         value_fn=lambda entity: _coerce_bool(entity.device_state.get("power"), on_value=1),
     ),
     NinebotBinarySensorEntityDescription(
-        key="lock",
+        key="unlocked",
         device_class=BinarySensorDeviceClass.LOCK,
         value_fn=lambda entity: _coerce_bool(entity.device_state.get("lock"), on_value=0),
     ),

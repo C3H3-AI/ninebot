@@ -93,6 +93,33 @@ SENSOR_DESCRIPTIONS: tuple[NinebotSensorEntityDescription, ...] = (
         value_fn=lambda entity: entity.device_state.get("last_energy"),
         attrs_fn=_last_energy_attributes,
     ),
+    NinebotSensorEntityDescription(
+        key="bms_voltage",
+        device_class=SensorDeviceClass.VOLTAGE,
+        native_unit_of_measurement="V",
+        state_class=SensorStateClass.MEASUREMENT,
+        suggested_display_precision=1,
+        value_fn=lambda entity: entity.device_state.get("bms_voltage"),
+    ),
+    NinebotSensorEntityDescription(
+        key="batt_temp",
+        device_class=SensorDeviceClass.TEMPERATURE,
+        native_unit_of_measurement="°C",
+        state_class=SensorStateClass.MEASUREMENT,
+        suggested_display_precision=1,
+        value_fn=lambda entity: entity.device_state.get("batt_temp"),
+    ),
+    NinebotSensorEntityDescription(
+        key="bms_cycles",
+        icon="mdi:battery-sync",
+        state_class=SensorStateClass.TOTAL_INCREASING,
+        value_fn=lambda entity: entity.device_state.get("bms_cycles"),
+        attrs_fn=lambda entity: (
+            {"bms_score": entity.device_state["bms_score"]}
+            if "bms_score" in entity.device_state
+            else {}
+        ),
+    ),
 )
 
 

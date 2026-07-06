@@ -54,6 +54,15 @@
       },
       "last_energy": {
         "name": "Last energy"
+      },
+      "bms_voltage": {
+        "name": "BMS voltage"
+      },
+      "batt_temp": {
+        "name": "Battery temperature"
+      },
+      "bms_cycles": {
+        "name": "BMS cycles"
       }
     },
     "binary_sensor": {
@@ -63,8 +72,8 @@
       "power": {
         "name": "Power status"
       },
-      "lock": {
-        "name": "Lock status"
+      "unlocked": {
+        "name": "Unlock status"
       }
     },
     "button": {

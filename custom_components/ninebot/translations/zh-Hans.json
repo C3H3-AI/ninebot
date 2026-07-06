@@ -54,6 +54,15 @@
       },
       "last_energy": {
         "name": "最后耗电"
+      },
+      "bms_voltage": {
+        "name": "BMS 电压"
+      },
+      "batt_temp": {
+        "name": "电池温度"
+      },
+      "bms_cycles": {
+        "name": "BMS 循环次数"
       }
     },
     "binary_sensor": {
@@ -63,8 +72,8 @@
       "power": {
         "name": "电源状态"
       },
-      "lock": {
-        "name": "锁定状态"
+      "unlocked": {
+        "name": "解锁状态"
       }
     },
     "button": {

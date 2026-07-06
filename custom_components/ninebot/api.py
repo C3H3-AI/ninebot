@@ -31,7 +31,6 @@ class NinebotCliClient:
     def __init__(self, config_dir: Path) -> None:
         self._config_dir = config_dir
         self._command_lock = asyncio.Lock()
-        self._cycle_lock = asyncio.Lock()
 
     async def async_login(self, username: str, password: str) -> dict[str, Any]:
         payload = await self._async_run_json_command(
@@ -58,34 +57,9 @@ class NinebotCliClient:
         return self._normalize_status(status)
 
     async def async_get_device_state(self, sn: str, *, month: str | None = None) -> dict[str, Any]:
-        month = month or datetime.now(UTC).strftime("%Y%m")
         state = await self.async_get_device_status(sn)
-        try:
-            travel = await self._async_run_json_command(
-                ["travel", sn, "--month", month, "--json"]
-            )
-        except NinebotApiConnectionError as err:
-            LOGGER.debug("Failed to fetch Ninebot travel data for %s: %s", sn, err)
-        else:
-            if isinstance(travel, dict):
-                state.update(self._normalize_travel(travel))
+        state.update(await self.async_get_device_travel(sn, month=month))
         return state
-
-    async def async_get_all_device_payloads(self) -> list[dict[str, Any]]:
-        async with self._cycle_lock:
-            devices = await self.async_get_device_list()
-            results: list[dict[str, Any]] = []
-            for device in devices:
-                sn = device.get("sn")
-                if not isinstance(sn, str) or not sn:
-                    continue
-                state = await self.async_get_device_state(sn)
-                results.append({
-                    "sn": sn,
-                    "info": device,
-                    "state": state,
-                })
-            return results
 
     async def async_bell(self, sn: str) -> dict[str, Any]:
         payload = await self._async_run_json_command(["bell", sn, "--json"])
@@ -102,6 +76,43 @@ class NinebotCliClient:
     async def async_unlock(self, sn: str) -> dict[str, Any]:
         payload = await self._async_run_json_command(["engine-start", sn, "--yes", "--json"])
         return payload if isinstance(payload, dict) else {}
+
+    async def async_get_battery(self, sn: str) -> dict[str, Any]:
+        payload = await self._async_run_json_command(["battery", sn, "--json"])
+        return payload if isinstance(payload, dict) else {}
+
+    async def async_get_device_travel(
+        self, sn: str, *, month: str | None = None
+    ) -> dict[str, Any]:
+        if month is None:
+            month = datetime.now(UTC).strftime("%Y%m")
+        result = await self._async_fetch_travel(sn, month)
+        if result.get("last_ride") is None:
+            previous = self._previous_year_month(month)
+            fallback = await self._async_fetch_travel(sn, previous)
+            if fallback.get("last_ride") is not None:
+                return fallback
+        return result
+
+    async def _async_fetch_travel(self, sn: str, month: str) -> dict[str, Any]:
+        try:
+            travel = await self._async_run_json_command(
+                ["travel", sn, "--month", month, "--json"]
+            )
+        except NinebotApiConnectionError as err:
+            LOGGER.debug("Failed to fetch Ninebot travel data for %s: %s", sn, err)
+            return {}
+        if not isinstance(travel, dict):
+            return {}
+        return self._normalize_travel(travel)
+
+    @staticmethod
+    def _previous_year_month(year_month: str) -> str:
+        year = int(year_month[:4])
+        month = int(year_month[4:6])
+        if month == 1:
+            return f"{year - 1}12"
+        return f"{year}{month - 1:02d}"
 
     async def _async_run_json_command(self, args: list[str]) -> Any:
         command = [
@@ -244,6 +255,45 @@ class NinebotCliClient:
         if month_used_electricity is not None:
             state["month_used_electricity"] = month_used_electricity
         return state
+
+    @staticmethod
+    def _normalize_battery(payload: dict[str, Any]) -> dict[str, Any]:
+        if not isinstance(payload, dict):
+            return {}
+        # ninecli 0.1.7 returns battery info at the top level; some earlier
+        # samples wrapped it under "data". Accept both shapes.
+        candidate = payload.get("data")
+        data = candidate if isinstance(candidate, dict) else payload
+
+        normalized: dict[str, Any] = {}
+
+        charging_power = _coerce_float(data.get("charging_power"))
+        if charging_power is not None:
+            normalized["charging_power"] = charging_power
+
+        battery_list = data.get("battery_list")
+        if isinstance(battery_list, list) and battery_list:
+            first = battery_list[0]
+            if isinstance(first, dict):
+                bms_voltage = _coerce_float(first.get("bms_volt"))
+                if bms_voltage is not None:
+                    normalized["bms_voltage"] = bms_voltage
+
+                bat_temp = _coerce_float(first.get("bat_temp"))
+                if bat_temp is not None:
+                    normalized["batt_temp"] = bat_temp
+
+                bms_cycles = _coerce_int(first.get("bms_cycle"))
+                if bms_cycles is not None:
+                    normalized["bms_cycles"] = bms_cycles
+
+                score = _coerce_int(first.get("score"))
+                if score is None:
+                    score = _coerce_float(first.get("score"))
+                if score is not None:
+                    normalized["bms_score"] = score
+
+        return normalized
 
 
 def _coerce_float(value: Any) -> float | None:

@@ -40,6 +40,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: NinebotConfigEntry) -> b
     config_dir = _storage_dir(hass, business_uid)
     client = NinebotCliClient(config_dir)
     coordinator = NinebotDataUpdateCoordinator(hass, entry, client)
+    await coordinator.async_first_sync()
     await coordinator.async_config_entry_first_refresh()
 
     entry.runtime_data = coordinator
